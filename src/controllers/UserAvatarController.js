@@ -1,37 +1,46 @@
-// Knex, App Error and Disk Storage Import
-const knex = require("../database/knex");
-const AppError = require("../utils/AppError");
-const DiskStorage = require("../providers/DiskStorage");
+const sqliteConnection = require('../database/sqlite')
+
+const AppError = require('../utils/AppError');
+const DiskStorage = require("../providers/DiskStorageAvatar")
+
 
 class UserAvatarController {
-    async update(request, response) {
-        // Capturing ID Parameters and image filename
-        const user_id = request.user.id;
+    async update(request,response){
+        const user_id = request.user.id
         const avatarFilename = request.file.filename;
 
-        // Instantiating diskStorage
-        const diskStorage = new DiskStorage();
+        const diskStorage = new DiskStorage()
 
-        // Getting the user data through the informed ID
-        const user = await knex("users")
-            .where({ id: user_id }).first();
+        const database = await sqliteConnection();
 
-            // Verifications
-            if (!user) {
-                throw new AppError("Somente usuários autenticados podem mudar o avatar", 401)
-            }
+        const user = await database.get("SELECT * FROM users WHERE id = (?)", [user_id]);
 
-            // Deleting the old image if a new image is uploaded and saving the new image
-            if (user.avatar) {
-                await diskStorage.deleteFile(user.avatar);
-            }
+        if(!user){
+            throw new AppError("Somente usuários autenticados podem alterar a imagem de avatar",401)
+        }
 
-            const filename = await diskStorage.saveFile(avatarFilename);
-            user.avatar = filename;
+        if(user.avatar){
+            // deletando a foto antiga, se houver
+            await diskStorage.deleteFile(user.avatar);
+        }
 
-            await knex("users").update(user).where({ id: user_id });
+        // Fazendo a troca
+        const filename = await diskStorage.saveFile(avatarFilename);
+        user.avatar = filename;
 
-            return response.status(201).json(user);
+        // Atualizando os campos no db
+        await database.run(`
+        UPDATE users SET
+        avatar = ?
+        WHERE id = ?`,
+        [
+        user.avatar, 
+        user_id]
+        )
+
+
+        return response.json(user)
+
     }
 }
 

@@ -1,98 +1,109 @@
-// Hash, App Error and SQLite Connection Import
+// Importando depêndencias
 const { hash, compare } = require('bcryptjs');
 
 const AppError = require('../utils/AppError');
 
-const sqliteConnection = require('../database/sqlite');
+// Importando conexão com db
+const sqliteConnection = require('../database/sqlite')
 
-class UsersController {
+class UsersController{
     async create(request, response) {
-        // Capturing Body Parameters
-        const { name, email, password } = request.body;
-
-        // Connection with Database
-        const database = await sqliteConnection();
-        const checkUserExists = await database.get('SELECT * FROM users WHERE email = (?)', [email])
-
-        // Verifications
-        if(checkUserExists) {
-            throw new AppError('Erro: Este e-mail já está em uso!');
-        }
-
-        if(name.length < 3) {
-            throw new AppError('Erro: Digite um nome válido!');
-        }
-
-        if(!email.includes("@", ".") || !email.includes(".")) {
-            throw new AppError('Erro: Digite um email válido!');
-        }
-
-        if(password.length < 6) {
-            throw new AppError('Erro: A senha deve ter pelo menos 6 dígitos!');
-        }
+        // Parâmetros enviados pelo body
+        const {name, email, password} = request.body;
         
-        // Password Cryptography
+        // Conexão com o banco de dados
+        const database = await sqliteConnection();
+
+        // Conferindo a criação de usuários existentes
+        // Conferência para saber se o usuário já existe no db
+        const checkUserExist = await database.get("SELECT * FROM users WHERE email = (?)", [email])
+        // Agora com o retorno no db, se faz a condição
+        if(checkUserExist){
+            throw new AppError("Este e-mail já está em uso")
+        }
+
+
+        // Criptografia
         const hashedPassword = await hash(password, 8);
 
-        // Inserting the infos into the database
+        // Criando o usuário
+        // Inserção de dados
         await database.run(
-            'INSERT INTO users (name, email, password ) VALUES (?, ?, ?)',
-            [name, email, hashedPassword]
-        );
+            "INSERT INTO users (name, email, password) VALUES (?, ?, ?)", [name, email, hashedPassword]
+            );
 
-        return response.status(201).json();
+
+        return response.status(201).json()
     }
 
-    async update(request, response) {
-        // Capturing Body Parameters and ID Parameters
-        const {name, email, password, old_password } = request.body;
+    async update(request,response){
+        const { name, email, password, old_password } = request.body;
         const user_id = request.user.id
 
-        // Connection with Database
         const database = await sqliteConnection();
+
         const user = await database.get("SELECT * FROM users WHERE id = (?)", [user_id]);
 
-        // Verifications
-        if (!user) {
-            throw new AppError("Usuário não encontrado");
+        // Verificação se o usuário existe
+        if (!user){
+            throw new AppError ("Usuário não encontrado");
         }
 
         const userWithUpdatedEmail = await database.get("SELECT * FROM users WHERE email = (?)", [email]);
 
-        if(userWithUpdatedEmail && userWithUpdatedEmail.id !== user.id) {
-            throw new AppError("Este e-mail já está em uso.");
+        // Verificando se ele encontrou um email e se email já está em uso
+        if(userWithUpdatedEmail && userWithUpdatedEmail.id !== user.id){
+            throw new AppError ("Este e-mail já está em uso!");
         }
 
-        user.name = name;
-        user.email = email;
+        // Atribuindo novos valores para os campos no banco de dados, caso exista. Caso não exista, será mantido o valor do banco de dados
+        user.name = name ?? user.name;
+        user.email = email ?? user.email;
 
-        if (password && !old_password) {
-            throw new AppError("Você precisa informar a senha antiga para definir a nova senha");
+        // Verificação da senha
+        // SE for informada a nova senha, porém, não for informado a senha antiga:
+        if (password && !old_password){
+            throw new AppError  ("Para redefinir a senha é necessário informar a antiga");
         }
 
-        if (password && old_password) {
+        // SE a nova senha e a antiga senha forem informados:
+        if (password && old_password){
+            // Verificando se a old_password é REALMENTE a senha que consta no db
             const checkOldPassword = await compare(old_password, user.password);
 
-            if (!checkOldPassword) {
-                throw new AppError("A senha antiga não confere.");
-            }
+            if(checkOldPassword){
+                if (password === old_password){
+                    throw new AppError ("A nova senha informada é exatamente igual à anterior")
+                }
 
-            user.password = await hash(password, 8);
+            } else if(!checkOldPassword){
+                // Se a senha informada não bater com a senha que está no db
+                throw new AppError ("A senha antiga não confere")
+            }
+        
+
+            // Atualizando a senha com criptografia
+            user.password = await hash(password, 8)
         }
 
-        // Inserting the infos into the database
+        // Atualizando os valores
         await database.run(`
             UPDATE users SET
             name = ?,
             email = ?,
             password = ?,
-            updated_at = DATETIME("now")
+            updated_at = DATETIME('now')
             WHERE id = ?`,
-            [user.name, user.email, user.password, user_id]
-        );
+            [
+            user.name, 
+            user.email,
+            user.password, 
+            user_id]
+            );
 
-        return response.status(201).json();
+            return response.status(200).json();
     }
-}
+};
 
+// Exportando
 module.exports = UsersController;

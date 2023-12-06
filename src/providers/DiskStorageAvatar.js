@@ -3,16 +3,16 @@ const fs = require ('fs');
 const path = require ('path');
 
 // Import de arquivo de configuração
-const uploadConfig = require('../configs/upload');
+const uploadConfig = require('../configs/uploadAvatar');
 
-class DiskStorage {
+class DiskStorageAvatar {
     async saveFile(file){
         await fs.promises.rename(
             // Arquivo na posição "inicial"
             path.resolve(uploadConfig.TMP_FOLDER, file),
 
             // Arquivo na posição "final"
-            path.resolve(uploadConfig.UPLOADS_FOLDER, file)
+            path.resolve(uploadConfig.UPLOADSAVATAR_FOLDER, file)
         );
 
         return file;
@@ -20,7 +20,7 @@ class DiskStorage {
 
     async deleteFile(file){
         // Buscando o endereço do arquivo
-        const filePath = path.resolve(uploadConfig.UPLOADS_FOLDER, file);
+        const filePath = path.resolve(uploadConfig.UPLOADSAVATAR_FOLDER, file);
 
         // Tratando
         try{
@@ -38,4 +38,4 @@ class DiskStorage {
 }
 
 
-module.exports = DiskStorage;
+module.exports = DiskStorageAvatar;

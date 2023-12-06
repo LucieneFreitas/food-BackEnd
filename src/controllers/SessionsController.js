@@ -1,39 +1,44 @@
-// Knex, App Error, Compare, Token and AuthConfig Import
-const knex = require("../database/knex");
+// Importando a conexão com o banco de dados
+const knex = require('../database/knex');
 
-const authConfig = require("../configs/auth");
-const { sign } = require("jsonwebtoken");
+// Importando depêndencias
+const {compare} = require('bcryptjs');
 
-const AppError = require("../utils/AppError");
-const { compare } = require("bcryptjs");
+// Importando arquivo de configuração do jsonWebToken e o método sign
+const authJwtConfig = require('../configs/auth');
+const { sign } = require('jsonwebtoken');
 
-class SessionsController {
-    async create(request, response) {
-        // Capturing Body Parameters
+const AppError = require("../utils/AppError.js");
+
+
+class SessionsController{
+    async create(request, response){
         const { email, password } = request.body;
 
-        // Getting the user data through the informed e-mail
+        // Validação de usuário
         const user = await knex("users").where({ email }).first();
 
-        // Verifications
-        if (!user) {
-            throw new AppError("E-mail e/ou senha incorretos", 401);
+        if(!user){
+            throw new AppError ("E-mail e/ou senha incorreta", 401);
         }
 
+        // Validação de senha
         const passwordMatched = await compare(password, user.password);
 
-        if (!passwordMatched) {
-            throw new AppError("E-mail e/ou senha incorretos", 401);
+        if(!passwordMatched){
+            throw new AppError ("E-mail e/ou senha incorreta", 401);
         }
 
-        const { secret, expiresIn } = authConfig.jwt;
+        // Gerando um Token de autenticação
+        const { secret, expiresIn } = authJwtConfig.jwt;
+
         const token = sign({}, secret, {
             subject: String(user.id),
             expiresIn
         })
 
-        return response.status(201).json({ user, token });
+        return response.json({user, token});
     }
-}
+};
 
 module.exports = SessionsController;

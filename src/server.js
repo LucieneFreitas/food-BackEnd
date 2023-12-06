@@ -1,45 +1,63 @@
-// Imports
-require("express-async-errors");
-require("dotenv/config");
+// Tratamento de exceções
 
-const AppError = require("./utils/AppError");
-const express = require('express');
+require('express-async-errors');
+require("dotenv/config")
+const AppError = require('./utils/AppError');
 
-const routes = require("./routes");
-const database = require("./database/sqlite");
+// Importando arquivo de configurações das imagens enviadas
+const uploadConfig = require('./configs/upload');
+const uploadAvatarConfig = require('./configs/uploadAvatar');
 
-const uploadConfig = require("./configs/upload");
+// Importando o CORS
+const initCors = require("cors");
 
-const cors = require("cors");
+// Importando conexão com banco de dados relacional
+const databaseMigrationsRun = require('./database/sqlite/migrations');
 
+// Importando bibliotecas
+const express = require("express");
+
+// Importando rotas (ele vai buscar o arquivo index.js)
+const routes = require('./routes');
+
+// Executando o banco de dados
+databaseMigrationsRun();
+
+// Inicializando biblioteca
 const app = express();
-app.use(cors());
+// Inicilização do cors logo após o app
+app.use(initCors())
+
+// Atribuindo o tipo de dado que será enviado pelo body e as rotas que serão utilizadas
 app.use(express.json());
 
-// Searching static files
-app.use("/files", express.static(uploadConfig.UPLOADS_FOLDER));
+// Buscando por arquivo estáticos 
+app.use("/files/dishFiles", express.static(uploadConfig.UPLOADS_FOLDER))
+app.use("/files/avatarFiles", express.static(uploadAvatarConfig.UPLOADSAVATAR_FOLDER))
 
-app.use(routes);
-database();
+app.use(routes)
+
+
 
 app.use((error, request, response, next) => {
-    // Client error
+    // Sabendo se é um error gerado pelo client
     if(error instanceof AppError) {
         return response.status(error.statusCode).json({
-            status: "error",
+            status: 'error',
             message: error.message
         });
     }
 
     console.error(error);
 
-    // Server error
+    // erro "padrão" do servidor
     return response.status(500).json({
-        status: "error",
-        message: "Internal Server Error"
+        status: 'error',
+        message: "Internal server error"
     })
-})
+});
 
-// Running port
 const PORT = process.env.PORT || 3333;
-app.listen(PORT, () => console.log(`Server is running on Port ${PORT}`));
+app.listen(PORT, () => {
+    console.log(`O servidor local com node está rodando na porta: ${PORT}`)
+});
